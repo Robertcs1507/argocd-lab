@@ -1,4 +1,4 @@
-name: Build da aplicação
+name: Build e Deploy GitOps
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
       - "app/**"
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
@@ -34,3 +34,21 @@ jobs:
           tags: |
             ghcr.io/robertcs1507/argocd-lab:${{ github.sha }}
             ghcr.io/robertcs1507/argocd-lab:latest
+
+      - name: Atualizar manifesto GitOps
+        run: |
+          sed -i "s|image: ghcr.io/robertcs1507/argocd-lab:.*|image: ghcr.io/robertcs1507/argocd-lab:${GITHUB_SHA}|" deployment.yaml
+
+      - name: Commit da nova imagem
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add deployment.yaml
+
+          if git diff --cached --quiet; then
+            echo "Nenhuma alteração no manifesto"
+          else
+            git commit -m "Atualiza imagem para ${GITHUB_SHA} [skip ci]"
+            git push
+          fi
