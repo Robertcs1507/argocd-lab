@@ -15,6 +15,6 @@ spec:
     spec:
       containers:
       - name: nginx
-        image: nginx:1.29
+        image: ghcr.io/robertcs1507/argocd-lab:latest
         ports:
         - containerPort: 80
