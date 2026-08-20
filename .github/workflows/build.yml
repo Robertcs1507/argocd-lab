@@ -16,8 +16,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout do repositorio
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Login no GHCR
         uses: docker/login-action@v3
@@ -26,7 +28,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build e Push
+      - name: Build e Push da imagem
         uses: docker/build-push-action@v6
         with:
           context: ./app
@@ -35,11 +37,14 @@ jobs:
             ghcr.io/robertcs1507/argocd-lab:${{ github.sha }}
             ghcr.io/robertcs1507/argocd-lab:latest
 
-      - name: Atualizar manifesto GitOps
+      - name: Atualizar imagem no deployment
         run: |
           sed -i "s|image: ghcr.io/robertcs1507/argocd-lab:.*|image: ghcr.io/robertcs1507/argocd-lab:${GITHUB_SHA}|" deployment.yaml
 
-      - name: Commit da nova imagem
+          echo "Imagem definida no deployment:"
+          grep "image:" deployment.yaml
+
+      - name: Commit e Push do manifesto
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -47,8 +52,8 @@ jobs:
           git add deployment.yaml
 
           if git diff --cached --quiet; then
-            echo "Nenhuma alteração no manifesto"
+            echo "Nenhuma alteracao no deployment.yaml"
           else
             git commit -m "Atualiza imagem para ${GITHUB_SHA} [skip ci]"
-            git push
+            git push origin HEAD:main
           fi
