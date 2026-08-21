@@ -1,0 +1,38 @@
+name: Laboratorio de Jobs
+
+on:
+  workflow_dispatch:
+
+jobs:
+
+  teste:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Executar teste
+        run: |
+          echo "Executando testes..."
+          sleep 3
+          echo "Testes passaram!"
+
+  build:
+    needs: teste
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Executar build
+        run: |
+          echo "Executando build..."
+          sleep 3
+          echo "Build concluido!"
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Executar deploy
+        run: |
+          echo "Executando deploy..."
+          sleep 3
+          echo "Deploy concluido!"
