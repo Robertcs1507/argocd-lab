@@ -66,7 +66,7 @@ jobs:
         run: |
           sleep 3
           curl -fs http://localhost:8080 | \
-            grep "CI/CD + GitOps funcionando!"
+            grep "TEXTO QUE NÃO EXISTE"
 
 
   # ============================================================
