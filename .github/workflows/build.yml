@@ -1,5 +1,8 @@
 name: Build e Deploy GitOps
 
+# Define quando esta pipeline será executada.
+# Neste caso: quando houver push na branch main
+# e alguma alteração dentro do diretório app/.
 on:
   push:
     branches:
@@ -7,20 +10,93 @@ on:
     paths:
       - "app/**"
 
+# Permissões que o GITHUB_TOKEN terá durante a pipeline.
 permissions:
+  # Necessário porque a pipeline altera o deployment.yaml
+  # e faz commit de volta no repositório.
   contents: write
+
+  # Necessário para publicar imagens no GHCR.
   packages: write
 
+
 jobs:
-  build:
+
+  # ============================================================
+  # JOB 1 - TEST
+  # Antes de publicar uma imagem, verificamos se a aplicação
+  # consegue ser construída, iniciada e acessada.
+  # ============================================================
+  test:
+
+    # GitHub cria um Runner Ubuntu temporário.
     runs-on: ubuntu-latest
 
     steps:
+
+      # Baixa o conteúdo do nosso repositório para o Runner.
+      - name: Baixar codigo
+        uses: actions/checkout@v4
+
+      # Constrói uma imagem temporária usando app/Dockerfile.
+      # Esta imagem existe somente para realizarmos o teste.
+      - name: Construir imagem para teste
+        run: |
+          docker build -t app-teste ./app
+
+      # Cria um container baseado na imagem anterior.
+      #
+      # -d          = executa em background
+      # --name      = nome do container
+      # -p 8080:80  = porta 8080 do Runner -> porta 80 do Nginx
+      - name: Subir aplicacao para teste
+        run: |
+          docker run -d \
+            --name app-teste \
+            -p 8080:80 \
+            app-teste
+
+      # Verifica se a aplicação realmente está funcionando.
+      #
+      # curl acessa o Nginx.
+      # grep procura uma informação esperada no HTML.
+      #
+      # Se o texto não existir, o comando falha e o job TEST falha.
+      - name: Testar aplicacao
+        run: |
+          sleep 3
+          curl -fs http://localhost:8080 | \
+            grep "CI/CD + GitOps funcionando!"
+
+
+  # ============================================================
+  # JOB 2 - BUILD
+  # Este job somente será executado se o JOB test tiver sucesso.
+  # ============================================================
+  build:
+
+    # Cria uma dependência:
+    #
+    # TEST -> BUILD
+    #
+    # Se TEST falhar, BUILD não executa.
+    needs: test
+
+    # Outro Runner Ubuntu será criado para este job.
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # Baixa novamente o repositório.
+      #
+      # fetch-depth: 0 baixa todo o histórico Git,
+      # pois depois faremos commit/push do deployment.yaml.
       - name: Checkout do repositorio
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # Autentica no GitHub Container Registry (GHCR).
       - name: Login no GHCR
         uses: docker/login-action@v3
         with:
@@ -28,15 +104,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Constrói a imagem OFICIAL da aplicação e envia para o GHCR.
       - name: Build e Push da imagem
         uses: docker/build-push-action@v6
         with:
           context: ./app
           push: true
+
+          # Criamos duas tags.
+          #
+          # github.sha = identifica exatamente o commit.
+          # latest     = aponta para a versão mais recente.
           tags: |
             ghcr.io/robertcs1507/argocd-lab:${{ github.sha }}
             ghcr.io/robertcs1507/argocd-lab:latest
 
+      # Altera o deployment.yaml para apontar para a imagem
+      # correspondente ao commit que disparou a pipeline.
       - name: Atualizar imagem no deployment
         run: |
           sed -i "s|image: ghcr.io/robertcs1507/argocd-lab:.*|image: ghcr.io/robertcs1507/argocd-lab:${GITHUB_SHA}|" deployment.yaml
@@ -44,6 +128,10 @@ jobs:
           echo "Imagem definida no deployment:"
           grep "image:" deployment.yaml
 
+      # Salva a alteração do deployment.yaml de volta no Git.
+      #
+      # Depois disso, o Argo CD detectará a mudança no Git
+      # e sincronizará o Kubernetes.
       - name: Commit e Push do manifesto
         run: |
           git config user.name "github-actions[bot]"
