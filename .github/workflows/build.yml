@@ -21,29 +21,23 @@ jobs:
   # JOB 1 - TEST
   # Testa a aplicação antes de publicar a imagem.
   # ============================================================
-  test:
+    test:
     runs-on: ubuntu-latest
 
     steps:
-
-      # Baixa o código do repositório para o Runner.
       - name: Baixar codigo
         uses: actions/checkout@v4
 
-      # Constrói uma imagem temporária para teste.
       - name: Construir imagem para teste
         run: |
           docker build -t app-teste ./app
 
-      # Sobe um container Nginx usando a imagem criada.
-      #
-      # Porta 8080 do Runner -> porta 80 do container.
-      - name: Subir aplicacao para teste
+      - name: Validar configuracao do Nginx
         run: |
-          docker run -d \
-            --name app-teste \
-            -p 8080:80 \
-            app-teste
+          docker run --rm \
+            --add-host=backend-python.estudos.svc.cluster.local:127.0.0.1 \
+            app-teste \
+            nginx -t
 
       # Mostra o estado e os logs do container.
       #
