@@ -1,7 +1,5 @@
 name: Build e Deploy GitOps
 
-# Executa quando houver push na branch main
-# com alterações dentro do diretório app/.
 on:
   push:
     branches:
@@ -9,29 +7,35 @@ on:
     paths:
       - "app/**"
 
-# Permissões utilizadas pelo GITHUB_TOKEN
 permissions:
   contents: write
   packages: write
-
 
 jobs:
 
   # ============================================================
   # JOB 1 - TEST
-  # Testa a aplicação antes de publicar a imagem.
   # ============================================================
-    test:
+  test:
     runs-on: ubuntu-latest
 
     steps:
       - name: Baixar codigo
         uses: actions/checkout@v4
 
+      # Cria a imagem que sera validada pela CI.
       - name: Construir imagem para teste
         run: |
           docker build -t app-teste ./app
 
+      # O DNS backend-python.estudos.svc.cluster.local existe
+      # somente dentro do Kubernetes.
+      #
+      # No Runner do GitHub criamos temporariamente uma entrada
+      # para que o nginx consiga validar a configuracao.
+      #
+      # nginx -t verifica a sintaxe/configuracao sem precisar
+      # acessar realmente o backend.
       - name: Validar configuracao do Nginx
         run: |
           docker run --rm \
@@ -39,55 +43,21 @@ jobs:
             app-teste \
             nginx -t
 
-      # Mostra o estado e os logs do container.
-      #
-      # Isso ajuda a descobrir problemas de inicialização
-      # do Nginx, configuração, DNS, proxy etc.
-      - name: Verificar container
-        run: |
-          echo "===== CONTAINERS ====="
-          docker ps -a
-
-          echo ""
-          echo "===== LOGS DO NGINX ====="
-          docker logs app-teste
-
-      # Testa se o Nginx realmente está respondendo
-      # e se o conteúdo esperado está presente.
-      - name: Testar aplicacao
-        run: |
-          sleep 3
-
-          echo "===== RESPOSTA DO NGINX ====="
-          curl -v http://localhost:8080/
-
-          echo ""
-          echo "===== TESTE DO CONTEUDO ====="
-          curl -fs http://localhost:8080/ | grep "CI/CD + GitOps funcionando!"
-
 
   # ============================================================
   # JOB 2 - BUILD
-  #
-  # Só será executado se o job TEST terminar com sucesso.
+  # So executa se o TEST passar.
   # ============================================================
   build:
     needs: test
-
     runs-on: ubuntu-latest
 
     steps:
-
-      # Baixa novamente o repositório.
-      #
-      # fetch-depth: 0 traz todo o histórico Git porque
-      # posteriormente faremos commit do deployment.yaml.
       - name: Checkout do repositorio
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # Autentica no GitHub Container Registry.
       - name: Login no GHCR
         uses: docker/login-action@v3
         with:
@@ -95,12 +65,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Constrói a imagem oficial e publica no GHCR.
-      #
-      # São criadas duas tags:
-      #
-      # SHA    -> versão exata relacionada ao commit
-      # latest -> versão mais recente
       - name: Build e Push da imagem
         uses: docker/build-push-action@v6
         with:
@@ -110,8 +74,6 @@ jobs:
             ghcr.io/robertcs1507/argocd-lab:${{ github.sha }}
             ghcr.io/robertcs1507/argocd-lab:latest
 
-      # Atualiza o deployment.yaml para utilizar
-      # exatamente a imagem criada neste commit.
       - name: Atualizar imagem no deployment
         run: |
           sed -i "s|image: ghcr.io/robertcs1507/argocd-lab:.*|image: ghcr.io/robertcs1507/argocd-lab:${GITHUB_SHA}|" deployment.yaml
@@ -119,10 +81,6 @@ jobs:
           echo "Imagem definida no deployment:"
           grep "image:" deployment.yaml
 
-      # Faz commit da alteração do deployment.yaml.
-      #
-      # Depois disso o Argo CD detectará a mudança
-      # e sincronizará o Kubernetes.
       - name: Commit e Push do manifesto
         run: |
           git config user.name "github-actions[bot]"
