@@ -1,8 +1,7 @@
 name: Build e Deploy GitOps
 
-# Define quando esta pipeline será executada.
-# Neste caso: quando houver push na branch main
-# e alguma alteração dentro do diretório app/.
+# Executa quando houver push na branch main
+# com alterações dentro do diretório app/.
 on:
   push:
     branches:
@@ -10,13 +9,9 @@ on:
     paths:
       - "app/**"
 
-# Permissões que o GITHUB_TOKEN terá durante a pipeline.
+# Permissões utilizadas pelo GITHUB_TOKEN
 permissions:
-  # Necessário porque a pipeline altera o deployment.yaml
-  # e faz commit de volta no repositório.
   contents: write
-
-  # Necessário para publicar imagens no GHCR.
   packages: write
 
 
@@ -24,31 +19,25 @@ jobs:
 
   # ============================================================
   # JOB 1 - TEST
-  # Antes de publicar uma imagem, verificamos se a aplicação
-  # consegue ser construída, iniciada e acessada.
+  # Testa a aplicação antes de publicar a imagem.
   # ============================================================
   test:
-
-    # GitHub cria um Runner Ubuntu temporário.
     runs-on: ubuntu-latest
 
     steps:
 
-      # Baixa o conteúdo do nosso repositório para o Runner.
+      # Baixa o código do repositório para o Runner.
       - name: Baixar codigo
         uses: actions/checkout@v4
 
-      # Constrói uma imagem temporária usando app/Dockerfile.
-      # Esta imagem existe somente para realizarmos o teste.
+      # Constrói uma imagem temporária para teste.
       - name: Construir imagem para teste
         run: |
           docker build -t app-teste ./app
 
-      # Cria um container baseado na imagem anterior.
+      # Sobe um container Nginx usando a imagem criada.
       #
-      # -d          = executa em background
-      # --name      = nome do container
-      # -p 8080:80  = porta 8080 do Runner -> porta 80 do Nginx
+      # Porta 8080 do Runner -> porta 80 do container.
       - name: Subir aplicacao para teste
         run: |
           docker run -d \
@@ -56,47 +45,55 @@ jobs:
             -p 8080:80 \
             app-teste
 
-      # Verifica se a aplicação realmente está funcionando.
+      # Mostra o estado e os logs do container.
       #
-      # curl acessa o Nginx.
-      # grep procura uma informação esperada no HTML.
-      #
-      # Se o texto não existir, o comando falha e o job TEST falha.
+      # Isso ajuda a descobrir problemas de inicialização
+      # do Nginx, configuração, DNS, proxy etc.
+      - name: Verificar container
+        run: |
+          echo "===== CONTAINERS ====="
+          docker ps -a
+
+          echo ""
+          echo "===== LOGS DO NGINX ====="
+          docker logs app-teste
+
+      # Testa se o Nginx realmente está respondendo
+      # e se o conteúdo esperado está presente.
       - name: Testar aplicacao
         run: |
           sleep 3
-          curl -fs http://localhost:8080 | \
-            grep "CD + GitOps funcionando!"
+
+          echo "===== RESPOSTA DO NGINX ====="
+          curl -v http://localhost:8080/
+
+          echo ""
+          echo "===== TESTE DO CONTEUDO ====="
+          curl -fs http://localhost:8080/ | grep "CI/CD + GitOps funcionando!"
 
 
   # ============================================================
   # JOB 2 - BUILD
-  # Este job somente será executado se o JOB test tiver sucesso.
+  #
+  # Só será executado se o job TEST terminar com sucesso.
   # ============================================================
   build:
-
-    # Cria uma dependência:
-    #
-    # TEST -> BUILD
-    #
-    # Se TEST falhar, BUILD não executa.
     needs: test
 
-    # Outro Runner Ubuntu será criado para este job.
     runs-on: ubuntu-latest
 
     steps:
 
       # Baixa novamente o repositório.
       #
-      # fetch-depth: 0 baixa todo o histórico Git,
-      # pois depois faremos commit/push do deployment.yaml.
+      # fetch-depth: 0 traz todo o histórico Git porque
+      # posteriormente faremos commit do deployment.yaml.
       - name: Checkout do repositorio
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # Autentica no GitHub Container Registry (GHCR).
+      # Autentica no GitHub Container Registry.
       - name: Login no GHCR
         uses: docker/login-action@v3
         with:
@@ -104,23 +101,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Constrói a imagem OFICIAL da aplicação e envia para o GHCR.
+      # Constrói a imagem oficial e publica no GHCR.
+      #
+      # São criadas duas tags:
+      #
+      # SHA    -> versão exata relacionada ao commit
+      # latest -> versão mais recente
       - name: Build e Push da imagem
         uses: docker/build-push-action@v6
         with:
           context: ./app
           push: true
-
-          # Criamos duas tags.
-          #
-          # github.sha = identifica exatamente o commit.
-          # latest     = aponta para a versão mais recente.
           tags: |
             ghcr.io/robertcs1507/argocd-lab:${{ github.sha }}
             ghcr.io/robertcs1507/argocd-lab:latest
 
-      # Altera o deployment.yaml para apontar para a imagem
-      # correspondente ao commit que disparou a pipeline.
+      # Atualiza o deployment.yaml para utilizar
+      # exatamente a imagem criada neste commit.
       - name: Atualizar imagem no deployment
         run: |
           sed -i "s|image: ghcr.io/robertcs1507/argocd-lab:.*|image: ghcr.io/robertcs1507/argocd-lab:${GITHUB_SHA}|" deployment.yaml
@@ -128,9 +125,9 @@ jobs:
           echo "Imagem definida no deployment:"
           grep "image:" deployment.yaml
 
-      # Salva a alteração do deployment.yaml de volta no Git.
+      # Faz commit da alteração do deployment.yaml.
       #
-      # Depois disso, o Argo CD detectará a mudança no Git
+      # Depois disso o Argo CD detectará a mudança
       # e sincronizará o Kubernetes.
       - name: Commit e Push do manifesto
         run: |
