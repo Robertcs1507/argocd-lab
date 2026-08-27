@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-python
+  namespace: estudos
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: backend-python
+
+  template:
+    metadata:
+      labels:
+        app: backend-python
+
+    spec:
+      containers:
+        - name: backend-python
+
+          # Essa imagem será criada pela nossa pipeline
+          image: ghcr.io/robertcs1507/argocd-lab-backend:latest
+
+          ports:
+            - containerPort: 5000
+
+          # Configuração que o Python recebe
+          # através de variáveis de ambiente
+          env:
+            - name: DB_HOST
+              value: "postgres-postgresql.database.svc.cluster.local"
+
+            - name: DB_NAME
+              value: "appdb"
+
+            - name: DB_USER
+              value: "appuser"
+
+            - name: DB_PASSWORD
+              value: "AppLab2026"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-python
+  namespace: estudos
+
+spec:
+  selector:
+    app: backend-python
+
+  ports:
+    - port: 5000
+      targetPort: 5000

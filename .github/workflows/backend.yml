@@ -1,0 +1,112 @@
+name: Backend Python CI/CD
+
+# Dispara quando houver alteração dentro de backend/
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+
+  # ==========================================
+  # JOB 1 - TEST
+  # ==========================================
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # Baixa nosso código
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Verifica se conseguimos construir
+      # a imagem do backend
+      - name: Testar build do backend
+        run: |
+          docker build \
+            -t backend-teste \
+            ./backend
+
+      # Sobe o backend temporariamente.
+      #
+      # Neste momento NÃO vamos testar /mensagens,
+      # porque ele precisaria alcançar nosso PostgreSQL
+      # que está dentro do nosso Kubernetes local.
+      - name: Subir backend
+        run: |
+          docker run -d \
+            --name backend-teste \
+            -p 5000:5000 \
+            backend-teste
+
+      # Testa apenas o endpoint básico /
+      - name: Testar API
+        run: |
+          sleep 3
+          curl -fs http://localhost:5000/
+
+
+  # ==========================================
+  # JOB 2 - BUILD
+  # ==========================================
+  build:
+
+    # Só executa se TEST passar
+    needs: test
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Login no nosso Registry
+      - name: Login no GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Constrói e publica a imagem oficial
+      - name: Build e Push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ghcr.io/robertcs1507/argocd-lab-backend:${{ github.sha }}
+            ghcr.io/robertcs1507/argocd-lab-backend:latest
+
+      # Atualiza o manifesto Kubernetes para usar
+      # exatamente a imagem desse commit
+      - name: Atualizar manifesto
+        run: |
+          sed -i "s|image: ghcr.io/robertcs1507/argocd-lab-backend:.*|image: ghcr.io/robertcs1507/argocd-lab-backend:${GITHUB_SHA}|" backend-deployment.yaml
+
+          grep "image:" backend-deployment.yaml
+
+      # Salva a nova versão do manifesto no Git
+      - name: Commit do manifesto
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add backend-deployment.yaml
+
+          if git diff --cached --quiet; then
+            echo "Nenhuma alteracao"
+          else
+            git commit -m "Atualiza backend para ${GITHUB_SHA} [skip ci]"
+            git push origin HEAD:main
+          fi
