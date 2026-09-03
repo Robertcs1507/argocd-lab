@@ -1,1 +1,2 @@
 teste de pipeline
+teste com || true
