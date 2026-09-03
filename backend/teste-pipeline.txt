@@ -1,2 +1,3 @@
 teste de pipeline
 teste com || true
+teste continue-on-error

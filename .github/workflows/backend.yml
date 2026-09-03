@@ -50,7 +50,10 @@ jobs:
       - name: Testar API
         run: |
           sleep 3
-          curl -fs http://localhost:5000/nao-existe || true
+          curl -fs http://localhost:5000/nao-existe
+      - name: Próximo passo
+        run: |
+          echo "Chgeui no proximo passo da pipeline"
 
 
   # ==========================================
