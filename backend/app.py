@@ -11,7 +11,7 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "AppLab2026")
 
 @app.route("/")
 def home():
-    return jsonify({"status": "backend python atualizando"})
+    return jsonify({"status": "backend versão nova"})
 
 @app.route("/mensagens")
 def mensagens():
