@@ -21,7 +21,7 @@ spec:
         - name: backend-python
 
           # Essa imagem será criada pela nossa pipeline
-          image: ghcr.io/robertcs1507/argocd-lab-backend:40856cdf5dca9343da3ef26f2e8f0d3342bd3c5d
+          image: ghcr.io/robertcs1507/argocd-lab-backend:a8516eaed23fceb8b305e49aeea20fdf88458ca1
 
           ports:
             - containerPort: 5000
