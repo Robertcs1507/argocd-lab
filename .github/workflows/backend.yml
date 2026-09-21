@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - "backend/**"
+      - ".github/workflows/backend.yml"
 
 permissions:
   contents: write
@@ -50,7 +51,7 @@ jobs:
       - name: Testar API
         run: |
           sleep 3
-          curl -fs http://localhost:5000/nao-existe
+          curl -fs http://localhost:5000/
       - name: Próximo passo
         run: |
           echo "Chgeui no proximo passo da pipeline"
