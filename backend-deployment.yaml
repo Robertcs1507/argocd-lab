@@ -15,6 +15,8 @@ spec:
     metadata:
       labels:
         app: backend-python
+      annotations:
+        lab-version: "2"
 
     spec:
       containers:
