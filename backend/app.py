@@ -17,6 +17,12 @@ def home():
 def health():
     return jsonify({"status": "ok"})
 
+@app.route("/pod")
+def pod():
+    return jsonify({
+        "pod": os.getenv("HOSTNAME", "desconhecido")
+    })
+
 @app.route("/mensagens")
 def mensagens():
     conn = psycopg2.connect(
