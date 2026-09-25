@@ -7,6 +7,11 @@ metadata:
 spec:
   ingressClassName: traefik
 
+  tls:
+    - hosts:
+        - app.lab
+      secretName: app-lab-tls
+
   rules:
     - host: app.lab
       http:
