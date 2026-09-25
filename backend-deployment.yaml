@@ -35,6 +35,14 @@ spec:
             periodSeconds: 10
             failureThreshold: 3
 
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+
           # Configuração que o Python recebe
           # através de variáveis de ambiente
           env:
