@@ -55,16 +55,11 @@ spec:
 
           # Configuração que o Python recebe
           # através de variáveis de ambiente
+
+          envFrom:
+            - configMapRef:
+                name: backend-config
           env:
-            - name: DB_HOST
-              value: "postgres-postgresql.database.svc.cluster.local"
-
-            - name: DB_NAME
-              value: "appdb"
-
-            - name: DB_USER
-              value: "appuser"
-
             - name: DB_PASSWORD
               value: "AppLab2026"
 

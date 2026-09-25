@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: estudos
+
+data:
+  DB_HOST: "postgres-postgresql.database.svc.cluster.local"
+  DB_NAME: "appdb"
+  DB_USER: "appuser"
