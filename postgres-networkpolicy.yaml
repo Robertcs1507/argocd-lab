@@ -1,0 +1,27 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-allow-backend
+  namespace: database
+
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: postgres
+      app.kubernetes.io/name: postgresql
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: estudos
+          podSelector:
+            matchLabels:
+              app: backend-python
+
+      ports:
+        - protocol: TCP
+          port: 5432
