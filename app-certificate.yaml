@@ -1,0 +1,15 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: app-lab-certificate
+  namespace: estudos
+
+spec:
+  secretName: app-lab-tls
+
+  dnsNames:
+    - app.lab
+
+  issuerRef:
+    name: selfsigned-issuer
+    kind: Issuer
