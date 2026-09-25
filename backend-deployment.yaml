@@ -29,7 +29,7 @@ spec:
 
           livenessProbe:
             httpGet:
-              path: /health-errado
+              path: /health
               port: 5000
             initialDelaySeconds: 5
             periodSeconds: 10
