@@ -61,8 +61,10 @@ spec:
                 name: backend-config
           env:
             - name: DB_PASSWORD
-              value: "AppLab2026"
-
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secret
+                  key: DB_PASSWORD
 ---
 apiVersion: v1
 kind: Service
